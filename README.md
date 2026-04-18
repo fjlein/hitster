@@ -36,6 +36,12 @@ If you find this DIY Hitster project useful, consider giving it a star :) !
         export CLIENT_SECRET="your_client_secret"
         export PLAYLIST_ID="your_playlist_id"
         ```
+    -   If your playlist is private/collaborative, use user auth mode:
+        ```bash
+        export SPOTIFY_AUTH_MODE="user"
+        export SPOTIFY_REDIRECT_URI="http://127.0.0.1:8888/callback"
+        ```
+        Then add that redirect URI in your Spotify app settings.
 
 ## ▶️ Usage
 
@@ -62,3 +68,10 @@ If you find this DIY Hitster project useful, consider giving it a star :) !
 -   Spotify Playlist: Change the `PLAYLIST_ID` environment variable to use a different Spotify playlist.  
 -   Card Dimensions: Change the `card_size`, `rows`, and `cols` variables in `hitster.typ` to adjust the card dimensions and page layout.  
 -   Marking Size: Change the `marking_padding` to adjust the space for cutting.
+
+## Troubleshooting
+
+- `403 Forbidden` while reading a playlist usually means your playlist is not publicly accessible to client-credentials auth.
+- Fix options:
+  - make the playlist public, or
+  - use `SPOTIFY_AUTH_MODE="user"` with `SPOTIFY_REDIRECT_URI` and log in once in the browser.

@@ -7,9 +7,11 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 import qrcode
+import requests
 import spotipy
 import typst
 from spotipy import SpotifyClientCredentials
+from spotipy.oauth2 import SpotifyOAuth
 import qrcode.image.svg
 import logging
 import calendar
@@ -25,6 +27,42 @@ def get_env_var(key):
     return value
 
 
+def get_env_var_optional(key):
+    return os.getenv(key)
+
+
+def create_spotify_client():
+    auth_mode = get_env_var_optional("SPOTIFY_AUTH_MODE") or "client_credentials"
+
+    if auth_mode == "user":
+        # User auth can access private/collaborative playlists.
+        client_id = get_env_var("CLIENT_ID")
+        client_secret = get_env_var("CLIENT_SECRET")
+        redirect_uri = get_env_var("SPOTIFY_REDIRECT_URI")
+        scope = (
+            get_env_var_optional("SPOTIFY_SCOPE")
+            or "playlist-read-private playlist-read-collaborative"
+        )
+
+        return spotipy.Spotify(
+            auth_manager=SpotifyOAuth(
+                client_id=client_id,
+                client_secret=client_secret,
+                redirect_uri=redirect_uri,
+                scope=scope,
+                cache_path=".spotify_token_cache",
+                open_browser=True,
+            )
+        )
+
+    return spotipy.Spotify(
+        auth_manager=SpotifyClientCredentials(
+            client_id=get_env_var("CLIENT_ID"),
+            client_secret=get_env_var("CLIENT_SECRET"),
+        )
+    )
+
+
 def resolve_date(date_str):
     date_parts = date_str.split("-")[::-1]
     parts = [""] * (3 - len(date_parts)) + date_parts
@@ -38,12 +76,21 @@ def resolve_date(date_str):
 
 def get_playlist_songs(sp, playlist_id):
     songs = []
-    results = sp.playlist_tracks(playlist_id)
+    next_url = f"https://api.spotify.com/v1/playlists/{playlist_id}/items?limit=100&additional_types=track"
 
-    while results:
-        for item in results["items"]:
-            track = item["track"]
-            if track:
+    while next_url:
+        token = sp.auth_manager.get_access_token(as_dict=False)
+        response = requests.get(
+            next_url,
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        results = response.json()
+
+        for item in results.get("items", []):
+            track = item.get("track") or item.get("item")
+            if track and track.get("type") == "track":
                 day, month, year = resolve_date(track["album"]["release_date"])
                 songs.append(
                     {
@@ -58,7 +105,7 @@ def get_playlist_songs(sp, playlist_id):
                     }
                 )
 
-        results = sp.next(results) if results["next"] else None
+        next_url = results.get("next")
 
     random.shuffle(songs)
     return songs
@@ -93,12 +140,7 @@ def generate_overview_pdf(songs, output_pdf):
 
 
 def main():
-    sp = spotipy.Spotify(
-        auth_manager=SpotifyClientCredentials(
-            client_id=get_env_var("CLIENT_ID"),
-            client_secret=get_env_var("CLIENT_SECRET"),
-        )
-    )
+    sp = create_spotify_client()
 
     logging.info("Starting Spotify song retrieval")
     songs = get_playlist_songs(sp, get_env_var("PLAYLIST_ID"))
