@@ -39,9 +39,9 @@ If you find this DIY Hitster project useful, consider giving it a star :) !
 
 ## ▶️ Usage
 
-1.  Run the `main.py` script:  
+1.  Run the `main.py` script (put the exports into a .env fie first):  
     ```bash
-    poetry run python main.py
+    source .env && poetry run python main.py
     ```  
 2.  Print the `hitster.pdf` file:  
     -   Open the `hitster.pdf` file and duplex print it.  
